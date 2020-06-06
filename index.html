@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Navagis Web Developer - Richmond Sim</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+      #infoArea {
+        height: 30px;
+      }
+      #map {
+        height: 90%;
+      }
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+
+    <script>
+      var map;
+      var service;
+      var infowindow;
+      var x = 10.3157; 
+      var y = 123.8854;
+      var diff = 0.025;
+
+      /**
+       * Initialize
+       */
+      function initMap() {
+        // Display Map
+        var cebu = new google.maps.LatLng(x, y);
+        map = new google.maps.Map(
+            document.getElementById('map'), {center: cebu, zoom: 13});
+
+        // Query directions
+        new AutocompleteDirectionsHandler(map);
+
+        // Plot Restaurants
+        var request = {
+          location: cebu,
+          radius: 3000,
+          type: ['restaurant']
+        };
+        service = new google.maps.places.PlacesService(map);
+        service.nearbySearch(request, callback);
+      }
+
+      /**
+       * Callback to perform functions after querying restaurants
+       */
+      function callback(results, status) {
+        if (status == google.maps.places.PlacesServiceStatus.OK) {
+          createMarker(results);
+          restaurantCounterByArea(results);          
+        }
+      }
+
+      /**
+       * Adds markers to the restaurant locations
+       */
+      function createMarker(places) {
+        for (var i = 0; i < places.length; i++) {
+          var marker = new google.maps.Marker({
+            map: map,
+            position: places[i].geometry.location
+          });
+          addMarkerInfo(marker, places[i]);
+        }
+      }
+
+      /**
+       * Displays restaurant name when a marker is selected
+       */
+      function addMarkerInfo(marker, place) {
+        infowindow = new google.maps.InfoWindow();
+        google.maps.event.addListener(marker, 'click', function() {
+            infowindow.setContent(place.name);
+            infowindow.open(map, this);
+          });
+      }
+
+      /**
+       * Outer service for counting restaurants within selected polygonal area
+       */
+      function restaurantCounterByArea(places) {
+        var coordinates = [
+          { lat: x - diff, lng: y - diff },
+          { lat: x + diff, lng: y - diff },
+          { lat: x + diff, lng: y + diff },
+          { lat: x - diff, lng: y + diff },
+        ];
+
+        var polygon = new google.maps.Polygon({
+          map: map,
+          paths: coordinates,
+          strokeColor: '#FF0000',
+          strokeOpacity: 0.8,
+          fillColor: '#FF0000',
+          fillOpacity: 0.35,
+          draggable: true,
+          editable: true
+        });
+
+        google.maps.event.addListener(polygon.getPath(), 'set_at', function() {
+          counter(places, polygon);
+        });
+
+        google.maps.event.addListener(polygon.getPath(), 'insert_at', function() {
+          counter(places, polygon);
+        });
+      }
+
+      /**
+       * Internal engine for counting restaurants within selected polygonal area
+       */
+      function counter(places, polygon) {
+        selectedResto = 0;
+        for (var i = 0; i < places.length; i++) {
+          if (google.maps.geometry.poly.containsLocation(places[i].geometry.location, polygon)) {
+            ++selectedResto;
+          }
+        }
+        // Display number of selected restaurants
+        document.getElementById("restocount-output").innerHTML = selectedResto;
+      }
+
+      function AutocompleteDirectionsHandler(map) {
+        this.map = map;
+        this.originPlaceId = null;
+        this.destinationPlaceId = null;
+        this.travelMode = 'WALKING';
+        this.directionsService = new google.maps.DirectionsService;
+        this.directionsRenderer = new google.maps.DirectionsRenderer;
+        this.directionsRenderer.setMap(map);
+
+        var originInput = document.getElementById('origin-input');
+        var destinationInput = document.getElementById('destination-input');
+        var modeSelector = document.getElementById('mode-selector');
+
+        var originAutocomplete = new google.maps.places.Autocomplete(originInput);
+        // Specify just the place data fields that you need.
+        originAutocomplete.setFields(['place_id']);
+
+        var destinationAutocomplete =
+            new google.maps.places.Autocomplete(destinationInput);
+        // Specify just the place data fields that you need.
+        destinationAutocomplete.setFields(['place_id']);
+
+        this.setupClickListener('changemode-walking', 'WALKING');
+        this.setupClickListener('changemode-transit', 'TRANSIT');
+        this.setupClickListener('changemode-driving', 'DRIVING');
+
+        this.setupPlaceChangedListener(originAutocomplete, 'ORIG');
+        this.setupPlaceChangedListener(destinationAutocomplete, 'DEST');
+
+        this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(originInput);
+        this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(
+            destinationInput);
+        this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(modeSelector);
+      }
+
+      /**
+       * Sets a listener on a radio button to change the filter type on Places
+       */
+      AutocompleteDirectionsHandler.prototype.setupClickListener = function(
+          id, mode) {
+        var radioButton = document.getElementById(id);
+        var me = this;
+
+        radioButton.addEventListener('click', function() {
+          me.travelMode = mode;
+          me.route();
+        });
+      };
+
+      /**
+       * Sets a listener on a text box for changes in location
+       */
+      AutocompleteDirectionsHandler.prototype.setupPlaceChangedListener = function(
+          autocomplete, mode) {
+        var me = this;
+        autocomplete.bindTo('bounds', this.map);
+
+        autocomplete.addListener('place_changed', function() {
+          var place = autocomplete.getPlace();
+
+          if (!place.place_id) {
+            window.alert('Please select an option from the dropdown list.');
+            return;
+          }
+          if (mode === 'ORIG') {
+            me.originPlaceId = place.place_id;
+          } else {
+            me.destinationPlaceId = place.place_id;
+          }
+          me.route();
+        });
+      };
+
+      /**
+       * Internal engine for computation of route
+       */
+      AutocompleteDirectionsHandler.prototype.route = function() {
+        if (!this.originPlaceId || !this.destinationPlaceId) {
+          return;
+        }
+        var me = this;
+
+        this.directionsService.route(
+            {
+              origin: {'placeId': this.originPlaceId},
+              destination: {'placeId': this.destinationPlaceId},
+              travelMode: this.travelMode
+            },
+            function(response, status) {
+              if (status === 'OK') {
+                me.directionsRenderer.setDirections(response);
+              } else {
+                window.alert('Failed due to: ' + status);
+              }
+            });
+      };
+    </script>
+  </head>
+
+  <body>
+    <!-- display information area -->
+    <div id="infoArea">
+      Restaurants in selected area: <section id="restocount-output" style="display: inline"></div>
+    </div>
+
+    <!-- display control area -->
+    <div id="controlArea">
+      <table>
+        <tr>
+          <td>
+            <input id="origin-input" type="text" placeholder="Enter an origin location">
+          </td>
+          <td>
+            <input id="destination-input" type="text" placeholder="Enter a destination location">
+          </td>
+          <td>
+            <div id="mode-selector" class="controls">
+              <input type="radio" name="type" id="changemode-walking" checked="checked">
+              <label for="changemode-walking">Walking</label>
+    
+              <input type="radio" name="type" id="changemode-transit">
+              <label for="changemode-transit">Transit</label>
+    
+              <input type="radio" name="type" id="changemode-driving">
+              <label for="changemode-driving">Driving</label>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- display map -->
+    <div id="map"></div>
+
+    <!-- calls back to initMap -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD3f0EEq0YBoVimfQmBfH-iZ46oClAYYco&libraries=places,geometry&callback=initMap" async defer></script>
+  </body>
+
+</html>
