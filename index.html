@@ -266,15 +266,25 @@
       function fetchData(places, polygon) {
         selectedResto = 0;
         totalRestoRevenue = 0;
+        highestVisitCount = 0;
+        restoWithHighestVisitCount = '';
+
         for (var i = 0; i < places.length; i++) {
           if (google.maps.geometry.poly.containsLocation(places[i].geometry.location, polygon)) {
             ++selectedResto;
             totalRestoRevenue += parseInt(fetchRestaurantInfo(places[i].name).revenue);
+
+            if (parseInt(fetchRestaurantInfo(places[i].name).visits) > highestVisitCount) {
+              highestVisitCount = parseInt(fetchRestaurantInfo(places[i].name).visits);
+              restoWithHighestVisitCount = places[i].name;
+            }
           }
         }
         // Display data on dashboard
         document.getElementById("restocount-output").innerHTML = selectedResto;
         document.getElementById("totalrevenue-output").innerHTML = totalRestoRevenue;
+        document.getElementById("highestvisitcount-output").innerHTML = highestVisitCount;
+        document.getElementById("highestrestovisit-output").innerHTML = restoWithHighestVisitCount;
       }
 
       /**
@@ -390,8 +400,11 @@
           <td style="background-color:#d4d4d4"> Total Revenue from all restaurants in selected area: </td>
           <td style="width: 75px"><section id="totalrevenue-output" style="display: inline"></section></td>
 
-          <td style="background-color:#d4d4d4"> Highest customer visit: </td>
-          <td style="width: 75px"><section id="restocount-output" style="display: inline"></section></td>
+          <td style="background-color:#d4d4d4"> Most visit count in selected area: </td>
+          <td style="width: 75px"><section id="highestvisitcount-output" style="display: inline"></section></td>
+
+          <td style="background-color:#d4d4d4"> Most visited restaurant in selected area: </td>
+          <td><section id="highestrestovisit-output" style="display: inline"></section></td>
 
         </tr>
       </table>
