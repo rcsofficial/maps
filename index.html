@@ -54,7 +54,7 @@
       function callback(results, status) {
         if (status == google.maps.places.PlacesServiceStatus.OK) {
           createMarker(results);
-          restaurantCounterByArea(results);          
+          countRestoByArea(results);          
         }
       }
 
@@ -72,20 +72,167 @@
       }
 
       /**
-       * Displays restaurant name when a marker is selected
+       * Displays restaurant information when a marker is selected
        */
       function addMarkerInfo(marker, place) {
         infowindow = new google.maps.InfoWindow();
+
+        var contentString = 
+        '<div>'+
+        '<h1 id="firstHeading" class="firstHeading">' + place.name + '</h1>'+
+          '<div id="bodyContent">'+
+          '<h3>' + 'Owner' + '</h3>' +
+          '<p>' + fetchRestaurantInfo(place.name).owner + '</p>' +
+          '<h3>' + 'Specialty' + '</h3>' +
+          '<p>' + fetchRestaurantInfo(place.name).specialty + '</p>' +
+          '<h3>' + 'Visits' + '</h3>' +
+          '<p>' + fetchRestaurantInfo(place.name).visits + '</p>' +
+          '<h3>' + 'Revenue' + '</h3>' +
+          '<p> PHP ' + fetchRestaurantInfo(place.name).revenue + '/month </p>' +
+          '</div>'+
+        '</div>';
+
         google.maps.event.addListener(marker, 'click', function() {
-            infowindow.setContent(place.name);
+            infowindow.setContent(contentString);
             infowindow.open(map, this);
           });
       }
 
       /**
+       * Returns information every resturant according to a set of assumed data
+       */
+      function fetchRestaurantInfo(restaurantName) {
+        var restaurantDataSet = 
+        {
+          "Alberto's Pizza USC Branch":{
+            "owner":"Alberto P",
+            "specialty":"Western Pizza",
+            "visits":"398",
+            "revenue":"72000"
+          }, 
+          "Wang Shan Lo Chinese Cuisine":{
+            "owner":"Wang Shan Lo",
+            "specialty":"Chinese Noodles",
+            "visits":"174",
+            "revenue":"48000"
+          }, 
+          "Neo Neo Grill House":{
+            "owner":"Neomi G",
+            "specialty":"Pork Barbecue",
+            "visits":"632",
+            "revenue":"32000"
+          }, 
+          "Rai Rai Ken":{
+            "owner":"Kennedy R",
+            "specialty":"Ramen",
+            "visits":"562",
+            "revenue":"35000"
+          }, 
+          "Shakey's Pizza Parlor":{
+            "owner":"Jacmar C",
+            "specialty":"American Pizza",
+            "visits":"755",
+            "revenue":"80000"
+          }, 
+          "Goldilocks":{
+            "owner":"Clarita G",
+            "specialty":"Pastries",
+            "visits":"693",
+            "revenue":"62000"
+          }, 
+          "McDonald's":{
+            "owner":"Archie G",
+            "specialty":"Fried Chicken",
+            "visits":"720",
+            "revenue":"90000"
+          }, 
+          "M Citi Suites":{
+            "owner":"Tarzan C",
+            "specialty":"Roasted Pork",
+            "visits":"163",
+            "revenue":"41000"
+          }, 
+          "Muvanz Pocherohan And Seafoods":{
+            "owner":"Van M",
+            "specialty":"Pochero",
+            "visits":"475",
+            "revenue":"29000"
+          }, 
+          "Pixie's Sinugba - V.Rama Cebu":{
+            "owner":"Pixie L",
+            "specialty":"Sinugba",
+            "visits":"389",
+            "revenue":"32000"
+          }, 
+          "Han-nya Japanese Restaurant":{
+            "owner":"Hannah M",
+            "specialty":"Japanese Ramen",
+            "visits":"424",
+            "revenue":"46000"
+          }, 
+          "KOA Tree House":{
+            "owner":"Loui K",
+            "specialty":"Matcha",
+            "visits":"363",
+            "revenue":"38000"
+          }, 
+          "Ryan's Pizzarelli House":{
+            "owner":"Ryan P",
+            "specialty":"European Pizza",
+            "visits":"288",
+            "revenue":"27000"
+          }, 
+          "Don Henrico'S - Cebu":{
+            "owner":"Henrico D",
+            "specialty":"Italian Pasta",
+            "visits":"198",
+            "revenue":"23000"
+          }, 
+          "Laguna Garden Café":{
+            "owner":"Al L",
+            "specialty":"Banana Bread",
+            "visits":"78",
+            "revenue":"14000"
+          }, 
+          "Quest Hotel and Conference Center - Cebu":{
+            "owner":"Basti Q",
+            "specialty":"Baked Salmon",
+            "visits":"642",
+            "revenue":"89000"
+          }, 
+          "Wellcome Hotel":{
+            "owner":"Wella B",
+            "specialty":"Smoked Tuna",
+            "visits":"475",
+            "revenue":"56000"
+          }, 
+          "Chowabungga":{
+            "owner":"Boy A",
+            "specialty":"Pancit",
+            "visits":"577",
+            "revenue":"38000"
+          }, 
+          "Crowne Garden Hotel":{
+            "owner":"Justin F",
+            "specialty":"Foie gras",
+            "visits":"376",
+            "revenue":"52000"
+          }, 
+          "Metro Park Hotel - Cebu City":{
+            "owner":"Manny P",
+            "specialty":"Beef Steak",
+            "visits":"135",
+            "revenue":"53000"
+          }, 
+        }
+
+        return restaurantDataSet[restaurantName];
+      }
+
+      /**
        * Outer service for counting restaurants within selected polygonal area
        */
-      function restaurantCounterByArea(places) {
+      function countRestoByArea(places) {
         var coordinates = [
           { lat: x - diff, lng: y - diff },
           { lat: x + diff, lng: y - diff },
@@ -105,28 +252,34 @@
         });
 
         google.maps.event.addListener(polygon.getPath(), 'set_at', function() {
-          counter(places, polygon);
+          fetchData(places, polygon);
         });
 
         google.maps.event.addListener(polygon.getPath(), 'insert_at', function() {
-          counter(places, polygon);
+          fetchData(places, polygon);
         });
       }
 
       /**
-       * Internal engine for counting restaurants within selected polygonal area
+       * Internal engine for getting analytics from restaurants within selected polygonal area
        */
-      function counter(places, polygon) {
+      function fetchData(places, polygon) {
         selectedResto = 0;
+        totalRestoRevenue = 0;
         for (var i = 0; i < places.length; i++) {
           if (google.maps.geometry.poly.containsLocation(places[i].geometry.location, polygon)) {
             ++selectedResto;
+            totalRestoRevenue += parseInt(fetchRestaurantInfo(places[i].name).revenue);
           }
         }
-        // Display number of selected restaurants
+        // Display data on dashboard
         document.getElementById("restocount-output").innerHTML = selectedResto;
+        document.getElementById("totalrevenue-output").innerHTML = totalRestoRevenue;
       }
 
+      /**
+       * Auto-complete directions handler
+       */
       function AutocompleteDirectionsHandler(map) {
         this.map = map;
         this.originPlaceId = null;
@@ -229,7 +382,20 @@
   <body>
     <!-- display information area -->
     <div id="infoArea">
-      Restaurants in selected area: <section id="restocount-output" style="display: inline"></div>
+      <table>
+        <tr>
+          <td style="background-color:#d4d4d4"> Restaurants in selected area: </td>
+          <td style="width: 75px"><section id="restocount-output" style="display: inline"></section></td>
+
+          <td style="background-color:#d4d4d4"> Total Revenue from all restaurants in selected area: </td>
+          <td style="width: 75px"><section id="totalrevenue-output" style="display: inline"></section></td>
+
+          <td style="background-color:#d4d4d4"> Highest customer visit: </td>
+          <td style="width: 75px"><section id="restocount-output" style="display: inline"></section></td>
+
+        </tr>
+      </table>
+
     </div>
 
     <!-- display control area -->
@@ -262,7 +428,7 @@
     <div id="map"></div>
 
     <!-- calls back to initMap -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD3f0EEq0YBoVimfQmBfH-iZ46oClAYYco&libraries=places,geometry&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCx0H7x5QsKvgpA8KMkofu9LozGA6oar3g&libraries=places,geometry&callback=initMap" async defer></script>
   </body>
 
 </html>
